@@ -212,4 +212,19 @@ describe('multi-leg itinerary (SAN -> DEN -> FRA -> DEL -> IDR, 4 flights)', () 
     const s = sleeps(p)
     for (let i = 1; i < s.length; i++) expect(s[i].start >= s[i - 1].end!).toBe(true)
   })
+  it('gives each long flight its own sleep guidance and labels layover meals by body clock', () => {
+    const p = generatePlan(sanIdr)
+    const travel = p.days.find((d) => d.phase === 'travel')!
+    const flights = travel.items.filter((i) => i.kind === 'flight')
+    const within = (it: { start: string; end?: string }, f: { start: string; end?: string }) =>
+      DateTime.fromISO(it.start) >= DateTime.fromISO(f.start) && DateTime.fromISO(it.end!) <= DateTime.fromISO(f.end!)
+    const doze = travel.items.find((i) => i.kind === 'sleep' && /Doze/.test(i.title))!
+    const full = travel.items.find((i) => i.kind === 'sleep' && i.title === 'Sleep on the plane')!
+    expect(doze).toBeDefined()
+    expect(full).toBeDefined()
+    expect(within(doze, flights[1])).toBe(true) // DEN -> FRA red-eye
+    expect(within(full, flights[2])).toBe(true) // FRA -> DEL body night
+    expect(travel.items.some((i) => i.kind === 'note' && /Stay awake on this flight/.test(i.title))).toBe(false)
+    expect(travel.items.some((i) => i.kind === 'meal' && /body clock/.test(i.title))).toBe(true)
+  })
 })

@@ -245,6 +245,11 @@ export function generatePlan(input: TripInput): Plan {
       const seg = segs.find((sg) => s >= sg.from && s < sg.to)!
       if (seg.type === 'post') return [{ card: 'arrival', raw }]
       if (seg.type === 'flight') return FLIGHT_POINT_OK.includes(raw.kind) ? [{ card: 'travel', raw }] : []
+      if (seg.type === 'layover' && raw.kind === 'meal') {
+        const which = /breakfast/i.test(raw.title) ? 'breakfast' : /lunch/i.test(raw.title) ? 'lunch' : 'dinner'
+        return [{ card: 'travel', raw: { ...raw, title: `Light meal: it is ${which} time on your body clock`,
+          detail: `Local clocks say otherwise, but your body expects ${which} now. Something light keeps energy steady; skip it if you are not hungry.` } }]
+      }
       return [{ card: 'travel', raw }]
     }
     const eMs = raw.end.toMillis()
@@ -329,43 +334,72 @@ export function generatePlan(input: TripInput): Plan {
   travel.raws.push({ kind: 'note', title: 'No alcohol; avoid caffeine on board except as scheduled', start: dep0, evidence: 'moderate',
     detail: 'Alcohol and late caffeine fragment sleep and dehydrate you (CDC, Sleep Foundation).' })
 
-  // in-flight sleep decision
+  // in-flight sleep: one decision per long flight --------------------------------------
   const overlapH = (s: DateTime, en: DateTime, f: (typeof flights)[number]) =>
     Math.max(0, Math.min(en.toMillis(), f.arr.toMillis()) - Math.max(s.toMillis(), f.dep.toMillis())) / 3600_000
-  let bestN = -1
-  let bestF = flights[0]
-  let bestOv = 0
-  for (let n = P; n < a; n++) {
-    for (const f of flights) {
-      const ov = overlapH(nights[n], nightEnd(n), f)
-      if (ov > bestOv) { bestOv = ov; bestN = n; bestF = f }
-    }
-  }
+  const LONG_FLIGHT_H = 5
+  const sleepBlocks: { start: DateTime; end: DateTime; full: boolean }[] = []
   let inFlightSleep: { start: DateTime; end: DateTime } | undefined
-  if (bestOv >= 3) {
-    let s = DateTime.fromMillis(Math.max(nights[bestN].toMillis(), addHours(bestF.dep, 1).toMillis()))
-    let en = DateTime.fromMillis(Math.min(nightEnd(bestN).toMillis(), addHours(bestF.arr, -1).toMillis()))
-    if (en.toMillis() - s.toMillis() < 3600_000) {
-      s = DateTime.fromMillis(Math.max(nights[bestN].toMillis(), bestF.dep.toMillis()))
-      en = DateTime.fromMillis(Math.min(nightEnd(bestN).toMillis(), bestF.arr.toMillis()))
+  let longFlights = 0
+  for (const f of flights) {
+    const durH = (f.arr.toMillis() - f.dep.toMillis()) / 3600_000
+    if (durH < LONG_FLIGHT_H) continue
+    longFlights++
+    let bestN = -1
+    let bestOv = 0
+    for (let n = P; n < a; n++) {
+      const ov = overlapH(nights[n], nightEnd(n), f)
+      if (ov > bestOv) { bestOv = ov; bestN = n }
     }
-    inFlightSleep = { start: s, end: en }
-    travel.raws.push({ kind: 'sleep', title: 'Sleep on the plane', start: s, end: en, evidence: 'strong', key: true,
-      detail: 'This is your body-clock night. Eyeshade, earplugs and a dim screen help.' })
-    travel.raws.push({ kind: 'wake', title: 'Wake up', start: en, evidence: 'strong',
-      detail: 'Stretch, drink water and keep the cabin light low or bright as your light windows say.' })
-  } else if (nights[P].toMillis() >= landMs || nightEnd(P).toMillis() <= depMs) {
-    travel.raws.push({ kind: 'sleep', title: 'Sleep window', start: nights[P], end: nightEnd(P), evidence: 'strong', key: true,
-      detail: `Aim for about ${fmtH(len)} hours in a dark, cool room.` })
-  } else {
-    travel.raws.push({ kind: 'note', title: 'Stay awake on this flight; nap ≤30 min only', start: dep0, end: landing, evidence: 'moderate',
-      detail: "Your body-clock night is not on the plane, so keep sleep short and save it for the destination night (CDC)." })
+    if (bestOv >= 3) {
+      let st = DateTime.fromMillis(Math.max(nights[bestN].toMillis(), addHours(f.dep, 1).toMillis()))
+      let en = DateTime.fromMillis(Math.min(nightEnd(bestN).toMillis(), addHours(f.arr, -1).toMillis()))
+      if (en.toMillis() - st.toMillis() < 3600_000) {
+        st = DateTime.fromMillis(Math.max(nights[bestN].toMillis(), f.dep.toMillis()))
+        en = DateTime.fromMillis(Math.min(nightEnd(bestN).toMillis(), f.arr.toMillis()))
+      }
+      sleepBlocks.push({ start: st, end: en, full: true })
+      if (!inFlightSleep || en.toMillis() - st.toMillis() > inFlightSleep.end.toMillis() - inFlightSleep.start.toMillis()) {
+        inFlightSleep = { start: st, end: en }
+      }
+      travel.raws.push({ kind: 'sleep', title: 'Sleep on the plane', start: st, end: en, evidence: 'strong', key: true,
+        detail: 'This is your body-clock night. Eyeshade, earplugs and a dim screen help.' })
+      travel.raws.push({ kind: 'wake', title: 'Wake up', start: en, evidence: 'strong',
+        detail: 'Stretch, drink water and keep the cabin light low or bright as your light windows say.' })
+      continue
+    }
+    // No real overlap: on a long overnight flight, allow light sleep in the hours leading into the body night.
+    let dozeN = -1
+    for (let n = P; n <= a; n++) {
+      if (nightEnd(n).toMillis() > f.dep.toMillis() && nights[n].toMillis() <= addHours(f.arr, 3).toMillis()) { dozeN = n; break }
+    }
+    if (durH >= 6 && dozeN >= 0) {
+      const st = DateTime.fromMillis(Math.max(addHours(f.dep, 1).toMillis(), addHours(nights[dozeN], -3).toMillis()))
+      const en = DateTime.fromMillis(Math.min(addHours(f.arr, -0.5).toMillis(), nightEnd(dozeN).toMillis()))
+      if (en.toMillis() - st.toMillis() >= 1.5 * 3600_000) {
+        sleepBlocks.push({ start: st, end: en, full: false })
+        travel.raws.push({ kind: 'sleep', title: 'Doze if you can (light sleep OK)', start: st, end: en, evidence: 'moderate',
+          detail: `Your body-clock night starts about ${fmtLocal(nights[dozeN])}. On a long overnight flight it is fine to sleep a little early, but keep it light so you can sleep again when your real night comes.` })
+        continue
+      }
+    }
+    travel.raws.push({ kind: 'note', title: `Stay awake on ${f.leg.from} → ${f.leg.to}; nap ≤30 min only`, start: f.dep, end: f.arr, evidence: 'moderate',
+      detail: 'Your body-clock night is not on this flight, so keep sleep short and save it for your real night (CDC).' })
+  }
+  if (sleepBlocks.length === 0) {
+    if (nights[P].toMillis() >= landMs || nightEnd(P).toMillis() <= depMs) {
+      travel.raws.push({ kind: 'sleep', title: 'Sleep window', start: nights[P], end: nightEnd(P), evidence: 'strong', key: true,
+        detail: `Aim for about ${fmtH(len)} hours in a dark, cool room.` })
+    } else if (longFlights === 0) {
+      travel.raws.push({ kind: 'note', title: 'Stay awake on this flight; nap ≤30 min only', start: dep0, end: landing, evidence: 'moderate',
+        detail: "Your body-clock night is not on the plane, so keep sleep short and save it for the destination night (CDC)." })
+    }
   }
   // hydrate
   travel.raws.push({ kind: 'hydrate', title: 'Drink water before you board', start: addHours(dep0, -1), evidence: 'low',
     detail: 'Cabin air is dry; start hydrated.' })
   for (let t = addHours(dep0, 3); t.toMillis() < landMs - 3600_000; t = addHours(t, 3)) {
-    if (inFlightSleep && t.toMillis() >= inFlightSleep.start.toMillis() && t.toMillis() < inFlightSleep.end.toMillis()) continue
+    if (sleepBlocks.some((b) => t.toMillis() >= b.start.toMillis() && t.toMillis() < b.end.toMillis())) continue
     travel.raws.push({ kind: 'hydrate', title: 'Drink water', start: t, evidence: 'low', detail: 'A glass every few hours helps with dry cabin air.' })
   }
 

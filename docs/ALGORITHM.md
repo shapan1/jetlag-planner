@@ -26,7 +26,7 @@ Track `bodyBed_k` = where the body's bedtime sits on the *destination* wall cloc
 
 **Decoupling (v1.1).** The body-clock model above drives ONLY `light_seek`, `light_avoid` and melatonin eligibility. The body clock lives on the home wall clock; `bodyBed_k` is shown in the local zone of the day. Everything else (sleep, meals, caffeine, naps, hydrate, supplements, reset) is anchored to the LOCAL day:
 - Pre-departure days: sleep = habitual bed/wake shifted 1 h/day in the strategy direction (capped by `preShiftDays`).
-- In flight: unchanged (body night overlapping the flight by >= 3 h gives "Sleep on the plane").
+- In flight: decided per flight of >= 5 h. Body night overlapping the flight by >= 3 h gives "Sleep on the plane" (+ "Wake up"). Otherwise, on a flight of >= 6 h whose landing is within 3 h of the next body night, a "Doze if you can" block runs from max(dep+1h, bodyBed-3h) to min(arr-30min, bodyWake) when that is >= 1.5 h. Otherwise a per-flight "Stay awake on X -> Y; nap <= 30 min" note. The longest full block is the one the arrival-day logic treats as in-flight sleep. Meals that fall in a layover are relabelled "Light meal: it is <meal> time on your body clock".
 - Arrival night and all post days: sleep = habitual bedtime -> habitual wake in `destZone`. If landing is inside the local night (bed-2h .. wake-1h) and in-flight sleep was < 4 h, emit "Sleep now until HH:mm" (landing+1h -> habitual wake, >= 5 h); otherwise a "Stay awake until HH:mm tonight" note plus the normal night. Arrival-night bedtime is up to 1 h earlier if the person has been awake > 16 h.
 
 ## 3. Items emitted per day (all in the zone the person is physically in)
@@ -51,7 +51,7 @@ Let `B = bodyBed_k` (today's target bedtime), `Wk = B + sleepLen` (target wake),
 
 ## 4. Travel day specifics
 - Emit one `flight` item per leg (depart→arrive), zone = fromZone.
-- During the flight, compute the body-clock night (`B → Wk`) in UTC and emit `sleep` only if ≥ 3 h of it overlaps the flight; otherwise emit `note` "Stay awake on this flight; nap ≤30 min only".
+- For each flight of ≥ 5 h, compute the body-clock night (`B → Wk`) in UTC and emit `sleep` if ≥ 3 h of it overlaps the flight; else, on a flight of ≥ 6 h ending within 3 h of the next body night, emit a lighter "Doze if you can" `sleep` block leading into that night; else emit a per-flight `note` "Stay awake on X → Y; nap ≤30 min only". See §2 for the exact windows.
 - `light_avoid` during the flight when inside the avoid window: "Glasses on / eyeshade; dim screen".
 - Optional `fast` window: from boarding until the destination breakfast (`Wk + 0.5h` on arrival day) — title "Optional: skip plane meals; drink water", evidence **low**, detail notes the evidence is limited (Forbes-Robertson 2012).
 - `hydrate` every 3 h in flight. `note`: "No alcohol; avoid caffeine on board except as scheduled."
