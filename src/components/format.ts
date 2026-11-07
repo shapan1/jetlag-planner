@@ -18,15 +18,37 @@ export function itemRange(item: PlanItem, flightEndZone?: string): string {
     const e = DateTime.fromISO(item.end, { setZone: true }).setZone(flightEndZone)
     const days = Math.round(e.startOf('day').diff(s.startOf('day'), 'days').days)
     const plus = days > 0 ? ` (+${days} day${days > 1 ? 's' : ''})` : days < 0 ? ` (${days} day)` : ''
-    return `${a} ${s.toFormat('ZZZZ')} → ${e.toFormat('HH:mm ZZZZ')}${plus}`
+    return `${a} ${zoneLabel(s)} → ${e.toFormat('HH:mm')} ${zoneLabel(e)}${plus}`
   }
   const e = DateTime.fromISO(item.end, { setZone: true }).setZone(item.zone)
   const days = Math.round(e.startOf('day').diff(s.startOf('day'), 'days').days)
   return `${a} – ${e.toFormat('HH:mm')}${days > 0 ? ` (+${days})` : ''}`
 }
 
+/** Short zone names for places the browser only labels as "GMT+x". [standard, daylight]. */
+const ZONE_ABBR: Record<string, [string, string?]> = {
+  'Asia/Kolkata': ['IST'], 'Asia/Calcutta': ['IST'], 'Asia/Colombo': ['IST'],
+  'Asia/Kathmandu': ['NPT'], 'Asia/Dhaka': ['BST'], 'Asia/Karachi': ['PKT'],
+  'Europe/Berlin': ['CET', 'CEST'], 'Europe/Paris': ['CET', 'CEST'], 'Europe/Amsterdam': ['CET', 'CEST'],
+  'Europe/Zurich': ['CET', 'CEST'], 'Europe/Vienna': ['CET', 'CEST'], 'Europe/Copenhagen': ['CET', 'CEST'],
+  'Europe/Madrid': ['CET', 'CEST'], 'Europe/Rome': ['CET', 'CEST'], 'Europe/Brussels': ['CET', 'CEST'],
+  'Europe/London': ['GMT', 'BST'], 'Europe/Dublin': ['GMT', 'IST'], 'Europe/Lisbon': ['WET', 'WEST'],
+  'Europe/Helsinki': ['EET', 'EEST'], 'Europe/Athens': ['EET', 'EEST'], 'Europe/Istanbul': ['TRT'],
+  'Asia/Dubai': ['GST'], 'Asia/Qatar': ['AST'], 'Asia/Kuwait': ['AST'], 'Asia/Bahrain': ['AST'], 'Asia/Riyadh': ['AST'],
+  'Asia/Singapore': ['SGT'], 'Asia/Hong_Kong': ['HKT'], 'Asia/Tokyo': ['JST'], 'Asia/Seoul': ['KST'],
+  'Asia/Bangkok': ['ICT'], 'Asia/Kuala_Lumpur': ['MYT'], 'Australia/Sydney': ['AEST', 'AEDT'],
+  'Africa/Addis_Ababa': ['EAT'], 'Africa/Nairobi': ['EAT'], 'UTC': ['UTC'],
+}
+
+export function zoneLabel(dt: DateTime): string {
+  const m = ZONE_ABBR[dt.zoneName ?? '']
+  if (m) return dt.isInDST && m[1] ? m[1] : m[0]
+  const s = dt.toFormat('ZZZZ')
+  return s.startsWith('GMT') ? s.replace('GMT', 'UTC') : s
+}
+
 export function zoneAbbr(iso: string, zone: string): string {
-  return DateTime.fromISO(iso, { setZone: true }).setZone(zone).toFormat('ZZZZ')
+  return zoneLabel(DateTime.fromISO(iso, { setZone: true }).setZone(zone))
 }
 
 export function signed(n: number): string {
@@ -56,10 +78,10 @@ export const COMMON_ZONES: string[] = [
   'America/Toronto',
   'Europe/London',
   'Europe/Paris',
-  'Europe/Frankfurt',
+  'Europe/Berlin',
   'Europe/Istanbul',
   'Asia/Dubai',
-  'Asia/Doha',
+  'Asia/Qatar',
   'Asia/Kolkata',
   'Asia/Colombo',
   'Asia/Kathmandu',

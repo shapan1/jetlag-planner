@@ -49,7 +49,8 @@ export default function DayPanel({ day, legs, isToday, now, done, onToggle }: Pr
       </h3>
       {day.phase === 'travel' && (
         <p className="hint">
-          Times shown in {zoneAbbr(day.items[0]?.start ?? `${day.date}T12:00:00Z`, day.zone)} until you land.
+          Times are local to wherever you are at that moment, starting in{' '}
+          {zoneAbbr(day.items[0]?.start ?? `${day.date}T12:00:00Z`, day.zone)}. The zone is marked whenever it changes.
         </p>
       )}
       <p className="sleepstrip">
