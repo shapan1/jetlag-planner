@@ -263,6 +263,9 @@ export function generatePlan(input: TripInput): Plan {
         if (raw.kind === 'light_avoid') {
           res.push({ card: 'travel', raw: { ...piece(), title: 'Glasses on / eyeshade; dim your screen', key: false,
             detail: 'It is the wrong time of your body clock for bright light, so keep the cabin light and screens low.' } })
+        } else if (raw.kind === 'light_seek') {
+          res.push({ card: 'travel', raw: { ...piece(), title: 'Keep it bright: window shade up, reading light on', key: true,
+            detail: 'Your body clock wants light now, even on the plane. Open the window shade if it is daytime outside, keep your reading light on, and leave sunglasses and eyeshade off. Any light helps; daylight helps most.' } })
         }
       } else if (sg.type === 'post') {
         const p = piece()
@@ -385,6 +388,25 @@ export function generatePlan(input: TripInput): Plan {
     }
     travel.raws.push({ kind: 'note', title: `Stay awake on ${f.leg.from} → ${f.leg.to}; nap ≤30 min only`, start: f.dep, end: f.arr, evidence: 'moderate',
       detail: 'Your body-clock night is not on this flight, so keep sleep short and save it for your real night (CDC).' })
+  }
+  // light windows must not overlap in-flight sleep: trim or drop the overlapping part
+  if (sleepBlocks.length > 0) {
+    const kept: Raw[] = []
+    for (const r of travel.raws) {
+      if ((r.kind !== 'light_seek' && r.kind !== 'light_avoid') || !r.end) { kept.push(r); continue }
+      let st = r.start.toMillis()
+      let en = r.end.toMillis()
+      for (const b of sleepBlocks) {
+        const bs = b.start.toMillis()
+        const be = b.end.toMillis()
+        if (en <= bs || st >= be) continue
+        if (st < bs) en = bs // ends when sleep starts
+        else st = be // starts when sleep ends
+      }
+      if (en - st >= 30 * 60_000) kept.push({ ...r, start: DateTime.fromMillis(st, { zone: r.start.zone }), end: DateTime.fromMillis(en, { zone: r.start.zone }) })
+    }
+    travel.raws.length = 0
+    travel.raws.push(...kept)
   }
   if (sleepBlocks.length === 0) {
     if (nights[P].toMillis() >= landMs || nightEnd(P).toMillis() <= depMs) {
