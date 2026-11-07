@@ -5,8 +5,8 @@ export default function SummaryCard({ plan }: { plan: Plan }) {
   const s = plan.summary
   const words =
     s.strategy === 'delay'
-      ? 'Shift later, the long way round'
-      : 'Shift earlier, heading east'
+      ? 'Push your clock later (fewer days for this trip)'
+      : 'Pull your clock earlier'
   return (
     <section className="card summary" aria-labelledby="sum-h">
       <h2 id="sum-h" className="visually-hidden">

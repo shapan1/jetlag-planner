@@ -16,7 +16,7 @@ interface Props {
 function behind(h: number): string {
   const a = Math.round(Math.abs(h) * 2) / 2
   if (a === 0) return 'body clock in sync'
-  return `body clock still ${a} h ${h > 0 ? 'behind' : 'ahead'}`
+  return `body clock still ${a} h from destination time`
 }
 
 function endZone(start: string, legs: FlightLeg[]): string {

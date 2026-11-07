@@ -200,7 +200,7 @@ export default function TripForm({ initial, onBuild }: Props) {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="destZone">Living in</label>
+            <label htmlFor="destZone">Destination time zone</label>
             <select
               id="destZone"
               value={input.destZone}
@@ -252,7 +252,7 @@ export default function TripForm({ initial, onBuild }: Props) {
         <legend>Options</legend>
         <div className="row">
           <div className="field">
-            <label htmlFor="pre">Pre-shift days (0–3)</label>
+            <label htmlFor="pre">Days to start adjusting before you fly (0–3)</label>
             <select
               id="pre"
               value={input.preShiftDays}
@@ -288,8 +288,8 @@ export default function TripForm({ initial, onBuild }: Props) {
             onChange={(e) => setInput({ ...input, strategy: e.target.value as Strategy })}
           >
             <option value="auto">Auto (fastest)</option>
-            <option value="advance">Shift earlier</option>
-            <option value="delay">Shift later</option>
+            <option value="advance">Pull my clock earlier</option>
+            <option value="delay">Push my clock later</option>
           </select>
         </div>
         <Toggle

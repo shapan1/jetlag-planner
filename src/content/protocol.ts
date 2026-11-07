@@ -70,7 +70,7 @@ export const ITEM_KIND_META: Record<
       'Eating on local schedule is a gentle time cue, though human evidence for meal timing is limited (Forbes-Robertson 2012).',
   },
   fast: {
-    label: 'Skip food (optional)',
+    label: 'Skip plane meals (optional)',
     emoji: '⏳',
     tone: 'food',
     shortWhy:
@@ -91,7 +91,7 @@ export const ITEM_KIND_META: Record<
       'Optional extras such as magnesium, B-complex, vitamin C or omega-3 have low evidence for jet lag, so skip them if you like.',
   },
   exercise: {
-    label: 'Move',
+    label: 'Walk',
     emoji: '🚶',
     tone: 'move',
     shortWhy:
@@ -105,7 +105,7 @@ export const ITEM_KIND_META: Record<
       'Your flight window, shown so the rest of the plan can be read against it.',
   },
   reset: {
-    label: 'Morning anchor',
+    label: 'First morning',
     emoji: '🌅',
     tone: 'light',
     shortWhy:
@@ -171,7 +171,7 @@ export const SUPPLEMENTS: {
     note: 'Sold for focus and inflammation; evidence for jet lag is low. Optional.',
   },
   {
-    name: 'Caffeine + daylight ("morning anchor")',
+    name: 'Caffeine + daylight (first-morning routine)',
     flykittName: 'Circadian Reset',
     dose: 'Up to 200 mg caffeine, as needed',
     when:
@@ -188,8 +188,8 @@ export const FAQ: { q: string; a: string }[] = [
     a: 'No. This is an unaffiliated, free tool built from public science (CDC Yellow Book, Timeshifter and Sleep Foundation pages). Flykitt sells a kit with supplement packs and blue-light glasses plus a paid app. If you want that, buy it from them.',
   },
   {
-    q: 'Why does it say "shift later" when India is east of the US?',
-    a: 'Going east usually means shifting earlier, but a very large eastward shift can be cheaper to cover by delaying instead (antidromic re-entrainment). The planner works out both options, counting the days each needs, and picks the one with fewer days. No source gives a fixed threshold, so it compares them directly.',
+    q: 'Why does it say "push your clock later" when India is east of the US?',
+    a: 'Going east usually means pulling your clock earlier, but a very large eastward jump can be covered in fewer days by pushing it later instead (the scientific term is antidromic re-entrainment). The planner works out both options, counting the days each needs, and picks the one with fewer days. No source gives a fixed threshold, so it compares them directly.',
   },
   {
     q: 'What are blue-light glasses for, and do I need to buy them?',

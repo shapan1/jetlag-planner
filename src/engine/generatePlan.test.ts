@@ -114,7 +114,7 @@ describe('structure', () => {
   })
 
   it('warns when no pre-shift', () => {
-    expect(generatePlan({ ...base, preShiftDays: 0 }).summary.warnings.join(' ')).toMatch(/No pre-shift/)
+    expect(generatePlan({ ...base, preShiftDays: 0 }).summary.warnings.join(' ')).toMatch(/tougher first 2 days/)
   })
 
   it('handles zero pre-shift and 3 pre-shift days', () => {
@@ -161,7 +161,7 @@ describe('local-day anchoring', () => {
         const e = i.end ? DateTime.fromISO(i.end).toMillis() : s
         if (i.kind === 'meal') expect(inside(s), i.title).toBe(false)
         if (i.kind === 'caffeine_ok') expect(overlaps(s, e), i.title).toBe(false)
-        if ((i.kind === 'light_seek' || i.kind === 'light_avoid') && !i.title.startsWith('Glasses on / eyeshade')) {
+        if ((i.kind === 'light_seek' || i.kind === 'light_avoid') && !i.title.startsWith('Eyeshade or blue-blocking')) {
           expect(overlaps(s, e), i.title + i.start).toBe(false)
         }
       }
