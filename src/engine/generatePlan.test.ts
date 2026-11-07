@@ -181,3 +181,35 @@ describe('local-day anchoring', () => {
   })
 })
 
+
+describe('multi-leg itinerary (SAN -> DEN -> FRA -> DEL -> IDR, 4 flights)', () => {
+  const sanIdr: TripInput = {
+    ...base,
+    homeZone: 'America/Los_Angeles',
+    legs: [
+      { from: 'SAN', fromZone: 'America/Los_Angeles', to: 'DEN', toZone: 'America/Denver',
+        departLocal: '2026-12-09T12:39', arriveLocal: '2026-12-09T16:08' },
+      { from: 'DEN', fromZone: 'America/Denver', to: 'FRA', toZone: 'Europe/Berlin',
+        departLocal: '2026-12-09T17:25', arriveLocal: '2026-12-10T10:55' },
+      { from: 'FRA', fromZone: 'Europe/Berlin', to: 'DEL', toZone: 'Asia/Kolkata',
+        departLocal: '2026-12-10T13:20', arriveLocal: '2026-12-11T01:35' },
+      { from: 'DEL', fromZone: 'Asia/Kolkata', to: 'IDR', toZone: 'Asia/Kolkata',
+        departLocal: '2026-12-11T05:30', arriveLocal: '2026-12-11T07:15' },
+    ],
+  }
+  it('renders all four flights in order on the travel day and lands on Dec 11 IST', () => {
+    const p = generatePlan(sanIdr)
+    const travel = p.days.find((d) => d.phase === 'travel')!
+    const flights = travel.items.filter((i) => i.kind === 'flight')
+    expect(flights.map((f) => f.title)).toEqual([
+      'Flight SAN → DEN', 'Flight DEN → FRA', 'Flight FRA → DEL', 'Flight DEL → IDR',
+    ])
+    for (let i = 1; i < flights.length; i++) expect(flights[i].start >= flights[i - 1].end!).toBe(true)
+    expect(p.summary.rawShiftHours).toBe(13.5)
+    const arrival = p.days.find((d) => d.phase === 'arrival')!
+    expect(arrival.date).toBe('2026-12-11')
+    expect(p.days.every((d, i) => i === 0 || d.date > p.days[i - 1].date)).toBe(true)
+    const s = sleeps(p)
+    for (let i = 1; i < s.length; i++) expect(s[i].start >= s[i - 1].end!).toBe(true)
+  })
+})

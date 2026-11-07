@@ -11,6 +11,8 @@ interface Props {
   onBuild: (input: TripInput) => void
 }
 
+export const MAX_LEGS = 4
+
 export const BLANK_LEG: FlightLeg = {
   from: '',
   fromZone: 'America/New_York',
@@ -75,20 +77,20 @@ export default function TripForm({ initial, onBuild }: Props) {
   }
 
   const addLeg = () => {
-    if (input.legs.length >= 2) return
-    const first = input.legs[0]
-    const second: FlightLeg = {
-      from: first.to,
-      fromZone: first.toZone,
+    if (input.legs.length >= MAX_LEGS) return
+    const last = input.legs[input.legs.length - 1]
+    const next: FlightLeg = {
+      from: last.to,
+      fromZone: last.toZone,
       to: '',
       toZone: input.destZone,
       departLocal: '',
       arriveLocal: '',
     }
-    apply({ ...input, legs: [first, second] })
+    apply({ ...input, legs: [...input.legs, next] })
   }
 
-  const removeLeg = () => apply({ ...input, legs: [input.legs[0]] })
+  const removeLeg = (i: number) => apply({ ...input, legs: input.legs.filter((_, j) => j !== i) })
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -165,14 +167,14 @@ export default function TripForm({ initial, onBuild }: Props) {
             />
             {err(`arr${i}`)}
           </div>
-          {i === 1 && (
-            <button type="button" className="btn link" onClick={removeLeg}>
-              Remove connection
+          {i > 0 && (
+            <button type="button" className="btn link" onClick={() => removeLeg(i)}>
+              Remove this flight
             </button>
           )}
         </fieldset>
       ))}
-      {input.legs.length < 2 && (
+      {input.legs.length < MAX_LEGS && (
         <button type="button" className="btn secondary" onClick={addLeg}>
           + Add connection
         </button>
