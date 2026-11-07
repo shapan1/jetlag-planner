@@ -218,11 +218,11 @@ describe('multi-leg itinerary (SAN -> DEN -> FRA -> DEL -> IDR, 4 flights)', () 
     const flights = travel.items.filter((i) => i.kind === 'flight')
     const within = (it: { start: string; end?: string }, f: { start: string; end?: string }) =>
       DateTime.fromISO(it.start) >= DateTime.fromISO(f.start) && DateTime.fromISO(it.end!) <= DateTime.fromISO(f.end!)
-    const doze = travel.items.find((i) => i.kind === 'sleep' && /Doze/.test(i.title))!
+    const nap = travel.items.find((i) => i.kind === 'sleep' && /Nap on the plane/.test(i.title))!
     const full = travel.items.find((i) => i.kind === 'sleep' && i.title === 'Sleep on the plane')!
-    expect(doze).toBeDefined()
+    expect(nap).toBeDefined()
     expect(full).toBeDefined()
-    expect(within(doze, flights[1])).toBe(true) // DEN -> FRA red-eye
+    expect(within(nap, flights[1])).toBe(true) // DEN -> FRA red-eye
     expect(within(full, flights[2])).toBe(true) // FRA -> DEL body night
     expect(travel.items.some((i) => i.kind === 'note' && /Stay awake on this flight/.test(i.title))).toBe(false)
     expect(travel.items.some((i) => i.kind === 'meal' && /body clock/.test(i.title))).toBe(true)
