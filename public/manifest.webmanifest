@@ -1,0 +1,13 @@
+{
+  "name": "Jet Lag Planner",
+  "short_name": "JetLag",
+  "description": "Free jet-lag plan for US to India travel.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

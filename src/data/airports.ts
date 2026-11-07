@@ -1,0 +1,138 @@
+import type { Airport } from '../engine/types'
+
+type Row = [code: string, city: string, name: string, zone: string]
+
+const US: Row[] = [
+  ['JFK', 'New York', 'John F. Kennedy Intl', 'America/New_York'],
+  ['EWR', 'Newark', 'Newark Liberty Intl', 'America/New_York'],
+  ['LGA', 'New York', 'LaGuardia', 'America/New_York'],
+  ['BOS', 'Boston', 'Logan Intl', 'America/New_York'],
+  ['IAD', 'Washington', 'Dulles Intl', 'America/New_York'],
+  ['DCA', 'Washington', 'Reagan National', 'America/New_York'],
+  ['BWI', 'Baltimore', 'Baltimore/Washington Intl', 'America/New_York'],
+  ['PHL', 'Philadelphia', 'Philadelphia Intl', 'America/New_York'],
+  ['ATL', 'Atlanta', 'Hartsfield-Jackson Intl', 'America/New_York'],
+  ['MIA', 'Miami', 'Miami Intl', 'America/New_York'],
+  ['MCO', 'Orlando', 'Orlando Intl', 'America/New_York'],
+  ['ORD', 'Chicago', "O'Hare Intl", 'America/Chicago'],
+  ['MDW', 'Chicago', 'Midway Intl', 'America/Chicago'],
+  ['DTW', 'Detroit', 'Detroit Metro Wayne County', 'America/Detroit'],
+  ['MSP', 'Minneapolis', 'Minneapolis-St Paul Intl', 'America/Chicago'],
+  ['DFW', 'Dallas', 'Dallas/Fort Worth Intl', 'America/Chicago'],
+  ['IAH', 'Houston', 'George Bush Intercontinental', 'America/Chicago'],
+  ['AUS', 'Austin', 'Austin-Bergstrom Intl', 'America/Chicago'],
+  ['DEN', 'Denver', 'Denver Intl', 'America/Denver'],
+  ['PHX', 'Phoenix', 'Phoenix Sky Harbor Intl', 'America/Phoenix'],
+  ['LAS', 'Las Vegas', 'Harry Reid Intl', 'America/Los_Angeles'],
+  ['SLC', 'Salt Lake City', 'Salt Lake City Intl', 'America/Denver'],
+  ['SEA', 'Seattle', 'Seattle-Tacoma Intl', 'America/Los_Angeles'],
+  ['PDX', 'Portland', 'Portland Intl', 'America/Los_Angeles'],
+  ['SFO', 'San Francisco', 'San Francisco Intl', 'America/Los_Angeles'],
+  ['SJC', 'San Jose', 'Mineta San Jose Intl', 'America/Los_Angeles'],
+  ['OAK', 'Oakland', 'Oakland Intl', 'America/Los_Angeles'],
+  ['LAX', 'Los Angeles', 'Los Angeles Intl', 'America/Los_Angeles'],
+  ['SAN', 'San Diego', 'San Diego Intl', 'America/Los_Angeles'],
+  ['CLT', 'Charlotte', 'Charlotte Douglas Intl', 'America/New_York'],
+  ['RDU', 'Raleigh-Durham', 'Raleigh-Durham Intl', 'America/New_York'],
+  ['PIT', 'Pittsburgh', 'Pittsburgh Intl', 'America/New_York'],
+  ['STL', 'St. Louis', 'Lambert Intl', 'America/Chicago'],
+  ['MCI', 'Kansas City', 'Kansas City Intl', 'America/Chicago'],
+  ['CLE', 'Cleveland', 'Hopkins Intl', 'America/New_York'],
+  ['CVG', 'Cincinnati', 'Cincinnati/N. Kentucky Intl', 'America/New_York'],
+  ['TPA', 'Tampa', 'Tampa Intl', 'America/New_York'],
+  ['HNL', 'Honolulu', 'Daniel K. Inouye Intl', 'Pacific/Honolulu'],
+]
+
+const IN: Row[] = [
+  ['DEL', 'Delhi', 'Indira Gandhi Intl', 'Asia/Kolkata'],
+  ['BOM', 'Mumbai', 'Chhatrapati Shivaji Maharaj Intl', 'Asia/Kolkata'],
+  ['BLR', 'Bengaluru', 'Kempegowda Intl', 'Asia/Kolkata'],
+  ['HYD', 'Hyderabad', 'Rajiv Gandhi Intl', 'Asia/Kolkata'],
+  ['MAA', 'Chennai', 'Chennai Intl', 'Asia/Kolkata'],
+  ['CCU', 'Kolkata', 'Netaji Subhas Chandra Bose Intl', 'Asia/Kolkata'],
+  ['COK', 'Kochi', 'Cochin Intl', 'Asia/Kolkata'],
+  ['AMD', 'Ahmedabad', 'Sardar Vallabhbhai Patel Intl', 'Asia/Kolkata'],
+  ['PNQ', 'Pune', 'Pune Airport', 'Asia/Kolkata'],
+  ['GOI', 'Goa', 'Dabolim / Manohar Intl', 'Asia/Kolkata'],
+  ['TRV', 'Thiruvananthapuram', 'Trivandrum Intl', 'Asia/Kolkata'],
+  ['LKO', 'Lucknow', 'Chaudhary Charan Singh Intl', 'Asia/Kolkata'],
+  ['JAI', 'Jaipur', 'Jaipur Intl', 'Asia/Kolkata'],
+  ['ATQ', 'Amritsar', 'Sri Guru Ram Dass Jee Intl', 'Asia/Kolkata'],
+  ['CJB', 'Coimbatore', 'Coimbatore Intl', 'Asia/Kolkata'],
+  ['IXC', 'Chandigarh', 'Chandigarh Intl', 'Asia/Kolkata'],
+  ['GAU', 'Guwahati', 'Lokpriya Gopinath Bordoloi Intl', 'Asia/Kolkata'],
+  ['BBI', 'Bhubaneswar', 'Biju Patnaik Intl', 'Asia/Kolkata'],
+  ['VNS', 'Varanasi', 'Lal Bahadur Shastri Intl', 'Asia/Kolkata'],
+  ['SXR', 'Srinagar', 'Sheikh ul-Alam Intl', 'Asia/Kolkata'],
+  ['IXM', 'Madurai', 'Madurai Airport', 'Asia/Kolkata'],
+  ['IXE', 'Mangaluru', 'Mangaluru Intl', 'Asia/Kolkata'],
+  ['NAG', 'Nagpur', 'Dr. Babasaheb Ambedkar Intl', 'Asia/Kolkata'],
+]
+
+const OTHER: Row[] = [
+  ['DOH', 'Doha', 'Hamad Intl', 'Asia/Qatar'],
+  ['DXB', 'Dubai', 'Dubai Intl', 'Asia/Dubai'],
+  ['AUH', 'Abu Dhabi', 'Zayed Intl', 'Asia/Dubai'],
+  ['LHR', 'London', 'Heathrow', 'Europe/London'],
+  ['FRA', 'Frankfurt', 'Frankfurt Airport', 'Europe/Berlin'],
+  ['CDG', 'Paris', 'Charles de Gaulle', 'Europe/Paris'],
+  ['AMS', 'Amsterdam', 'Schiphol', 'Europe/Amsterdam'],
+  ['ZRH', 'Zurich', 'Zurich Airport', 'Europe/Zurich'],
+  ['IST', 'Istanbul', 'Istanbul Airport', 'Europe/Istanbul'],
+  ['SIN', 'Singapore', 'Changi', 'Asia/Singapore'],
+  ['HKG', 'Hong Kong', 'Hong Kong Intl', 'Asia/Hong_Kong'],
+  ['NRT', 'Tokyo', 'Narita Intl', 'Asia/Tokyo'],
+  ['HND', 'Tokyo', 'Haneda', 'Asia/Tokyo'],
+  ['ICN', 'Seoul', 'Incheon Intl', 'Asia/Seoul'],
+  ['MUC', 'Munich', 'Munich Airport', 'Europe/Berlin'],
+  ['YYZ', 'Toronto', 'Pearson Intl', 'America/Toronto'],
+  ['YVR', 'Vancouver', 'Vancouver Intl', 'America/Vancouver'],
+  ['KWI', 'Kuwait City', 'Kuwait Intl', 'Asia/Kuwait'],
+  ['BAH', 'Manama', 'Bahrain Intl', 'Asia/Bahrain'],
+  ['JED', 'Jeddah', 'King Abdulaziz Intl', 'Asia/Riyadh'],
+  ['RUH', 'Riyadh', 'King Khalid Intl', 'Asia/Riyadh'],
+  ['ADD', 'Addis Ababa', 'Bole Intl', 'Africa/Addis_Ababa'],
+  ['HEL', 'Helsinki', 'Helsinki-Vantaa', 'Europe/Helsinki'],
+  ['CPH', 'Copenhagen', 'Copenhagen Airport', 'Europe/Copenhagen'],
+  ['VIE', 'Vienna', 'Vienna Intl', 'Europe/Vienna'],
+]
+
+const mk = (rows: Row[], country: Airport['country']): Airport[] =>
+  rows.map(([code, city, name, zone]) => ({ code, city, name, country, zone }))
+
+export const AIRPORTS: Airport[] = [...mk(US, 'US'), ...mk(IN, 'IN'), ...mk(OTHER, 'OTHER')]
+
+const BY_CODE = new Map(AIRPORTS.map((a) => [a.code, a]))
+
+export function findAirport(code: string): Airport | undefined {
+  return BY_CODE.get(code.trim().toUpperCase())
+}
+
+export const COMMON_ZONES: { zone: string; label: string }[] = [
+  { zone: 'America/New_York', label: 'US Eastern (New York)' },
+  { zone: 'America/Chicago', label: 'US Central (Chicago)' },
+  { zone: 'America/Denver', label: 'US Mountain (Denver)' },
+  { zone: 'America/Phoenix', label: 'US Arizona (Phoenix)' },
+  { zone: 'America/Los_Angeles', label: 'US Pacific (Los Angeles)' },
+  { zone: 'America/Anchorage', label: 'US Alaska (Anchorage)' },
+  { zone: 'Pacific/Honolulu', label: 'US Hawaii (Honolulu)' },
+  { zone: 'Asia/Kolkata', label: 'India (Kolkata)' },
+  { zone: 'America/Toronto', label: 'Toronto' },
+  { zone: 'America/Vancouver', label: 'Vancouver' },
+  { zone: 'Europe/London', label: 'London' },
+  { zone: 'Europe/Paris', label: 'Paris' },
+  { zone: 'Europe/Berlin', label: 'Frankfurt / Munich (Berlin)' },
+  { zone: 'Europe/Amsterdam', label: 'Amsterdam' },
+  { zone: 'Europe/Zurich', label: 'Zurich' },
+  { zone: 'Europe/Istanbul', label: 'Istanbul' },
+  { zone: 'Asia/Qatar', label: 'Doha' },
+  { zone: 'Asia/Dubai', label: 'Dubai / Abu Dhabi' },
+  { zone: 'Asia/Riyadh', label: 'Riyadh / Jeddah' },
+  { zone: 'Asia/Kuwait', label: 'Kuwait' },
+  { zone: 'Asia/Bahrain', label: 'Bahrain' },
+  { zone: 'Asia/Singapore', label: 'Singapore' },
+  { zone: 'Asia/Hong_Kong', label: 'Hong Kong' },
+  { zone: 'Asia/Tokyo', label: 'Tokyo' },
+  { zone: 'Asia/Seoul', label: 'Seoul' },
+  { zone: 'Africa/Addis_Ababa', label: 'Addis Ababa' },
+]
