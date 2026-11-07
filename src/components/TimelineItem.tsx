@@ -1,17 +1,18 @@
 import type { PlanItem } from '../engine/types'
 import { ITEM_KIND_META } from '../content/protocol'
-import { timeRange, zoneAbbr } from './format'
+import { itemRange, zoneAbbr } from './format'
 
 interface Props {
   item: PlanItem
   dayZone: string
+  flightEndZone?: string
   done: boolean
   onToggle: (id: string) => void
 }
 
 const EVIDENCE_LABEL = { strong: 'Strong evidence', moderate: 'Moderate evidence', low: 'Limited evidence' } as const
 
-export default function TimelineItem({ item, dayZone, done, onToggle }: Props) {
+export default function TimelineItem({ item, dayZone, flightEndZone, done, onToggle }: Props) {
   const meta = ITEM_KIND_META[item.kind]
   const cbId = `cb-${item.id}`
   const detail = item.detail ?? meta.shortWhy
@@ -21,8 +22,8 @@ export default function TimelineItem({ item, dayZone, done, onToggle }: Props) {
       data-start={item.start}
     >
       <div className="tl-time">
-        <span>{timeRange(item)}</span>
-        {item.zone !== dayZone && <small>{zoneAbbr(item.start, item.zone)}</small>}
+        <span>{itemRange(item, flightEndZone)}</span>
+        {item.zone !== dayZone && item.kind !== 'flight' && <small>{zoneAbbr(item.start, item.zone)}</small>}
       </div>
       <div className="tl-body">
         <div className="tl-head">

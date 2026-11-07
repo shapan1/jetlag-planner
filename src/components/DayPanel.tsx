@@ -1,10 +1,12 @@
 import { DateTime } from 'luxon'
 import type { PlanDay } from '../engine/types'
 import TimelineItem from './TimelineItem'
-import { fmtDate } from './format'
+import type { FlightLeg } from '../engine/types'
+import { fmtDate, zoneAbbr } from './format'
 
 interface Props {
   day: PlanDay
+  legs: FlightLeg[]
   isToday: boolean
   now: number
   done: Record<string, true>
@@ -17,7 +19,13 @@ function behind(h: number): string {
   return `body clock still ${a} h ${h > 0 ? 'behind' : 'ahead'}`
 }
 
-export default function DayPanel({ day, isToday, now, done, onToggle }: Props) {
+function endZone(start: string, legs: FlightLeg[]): string {
+  const t = DateTime.fromISO(start).toMillis()
+  const leg = legs.find((l) => DateTime.fromISO(l.departLocal, { zone: l.fromZone }).toMillis() === t)
+  return (leg ?? legs[legs.length - 1]).toZone
+}
+
+export default function DayPanel({ day, legs, isToday, now, done, onToggle }: Props) {
   const items = [...day.items].sort(
     (a, b) => DateTime.fromISO(a.start).toMillis() - DateTime.fromISO(b.start).toMillis(),
   )
@@ -30,7 +38,7 @@ export default function DayPanel({ day, isToday, now, done, onToggle }: Props) {
   )
 
   const rows = items.map((it) => (
-    <TimelineItem key={it.id} item={it} dayZone={day.zone} done={!!done[it.id]} onToggle={onToggle} />
+    <TimelineItem key={it.id} item={it} dayZone={day.zone} flightEndZone={endZone(it.start, legs)} done={!!done[it.id]} onToggle={onToggle} />
   ))
   if (nowAt >= 0) rows.splice(nowAt, 0, nowLine)
 
@@ -39,6 +47,11 @@ export default function DayPanel({ day, isToday, now, done, onToggle }: Props) {
       <h3 id={`day-${day.date}`} className="day-title">
         {fmtDate(day.date, 'cccc, d LLLL')} <span className="day-label">{day.label}</span>
       </h3>
+      {day.phase === 'travel' && (
+        <p className="hint">
+          Times shown in {zoneAbbr(day.items[0]?.start ?? `${day.date}T12:00:00Z`, day.zone)} until you land.
+        </p>
+      )}
       <p className="sleepstrip">
         <strong>Sleep {day.targetBedtime} → {day.targetWake}</strong>
         <span> · {behind(day.remainingShiftHours)}</span>

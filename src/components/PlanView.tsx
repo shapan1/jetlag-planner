@@ -47,12 +47,12 @@ export default function PlanView({ plan, onEdit }: Props) {
       <DayNavigator days={plan.days} selected={sel} todayIndex={todayIndex} onSelect={setSelected} />
       <div className="screen-only">
         {plan.days[sel] && (
-          <DayPanel day={plan.days[sel]} isToday={sel === todayIndex} now={now} done={done} onToggle={toggle} />
+          <DayPanel legs={legs} day={plan.days[sel]} isToday={sel === todayIndex} now={now} done={done} onToggle={toggle} />
         )}
       </div>
       <div className="print-only">
         {plan.days.map((d) => (
-          <DayPanel key={d.date} day={d} isToday={false} now={now} done={done} onToggle={toggle} />
+          <DayPanel legs={legs} key={d.date} day={d} isToday={false} now={now} done={done} onToggle={toggle} />
         ))}
       </div>
       <SupplementsTable />

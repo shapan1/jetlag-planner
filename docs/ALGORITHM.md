@@ -24,14 +24,21 @@ Track `bodyBed_k` = where the body's bedtime sits on the *destination* wall cloc
 - Pre-shift days (before departure) use the SAME rule but expressed in home wall clock (advance: go to bed 1 h earlier each day; delay: 1 h later each day). Cap pre-shift at `preShiftDays` (default 2, CDC: 2–3 days).
 - `remainingShiftHours` for a day = signed difference between `bodyBed_k` and `bed`.
 
+**Decoupling (v1.1).** The body-clock model above drives ONLY `light_seek`, `light_avoid` and melatonin eligibility. The body clock lives on the home wall clock; `bodyBed_k` is shown in the local zone of the day. Everything else (sleep, meals, caffeine, naps, hydrate, supplements, reset) is anchored to the LOCAL day:
+- Pre-departure days: sleep = habitual bed/wake shifted 1 h/day in the strategy direction (capped by `preShiftDays`).
+- In flight: unchanged (body night overlapping the flight by >= 3 h gives "Sleep on the plane").
+- Arrival night and all post days: sleep = habitual bedtime -> habitual wake in `destZone`. If landing is inside the local night (bed-2h .. wake-1h) and in-flight sleep was < 4 h, emit "Sleep now until HH:mm" (landing+1h -> habitual wake, >= 5 h); otherwise a "Stay awake until HH:mm tonight" note plus the normal night. Arrival-night bedtime is up to 1 h earlier if the person has been awake > 16 h.
+
 ## 3. Items emitted per day (all in the zone the person is physically in)
+(Light and melatonin rows use the body-clock values; all other rows use `localWake`/`localBed` = the local sleep window, so read `B`/`Wk` there as `localBed`/`localWake`. Items falling inside sleep are skipped.)
+
 Let `B = bodyBed_k` (today's target bedtime), `Wk = B + sleepLen` (target wake), `T = Wk − 3h` (today's Tmin).
 
 | kind | advance | delay | evidence |
 |---|---|---|---|
 | sleep | B → Wk | B → Wk | strong |
 | wake | Wk | Wk | strong |
-| light_seek | T+0h → T+4h (post-nadir morning light) | T−4h → T (pre-nadir evening light) — clamp to ≤ midnight sensible, mark `key` | strong |
+| light_seek (clipped to localWake..localBed, dropped if < 45 min; converged <= 0.5 h: 2 h morning daylight only) | T+0h → T+4h (post-nadir morning light) | T−4h → T (pre-nadir evening light) — clamp to ≤ midnight sensible, mark `key` | strong |
 | light_avoid | T−4h → T (wear blue-blocking glasses if indoors lights/screens are unavoidable) | T → T+4h (sunglasses/glasses after wake if it is daylight) | strong |
 | melatonin (if useMelatonin) | 0.5–1 mg at `B − 90min` (CDC fig. 7.4.2 eastward). Skip when `B − 90min` falls between body-clock 00:00–05:00 (CDC: ineffective when endogenous melatonin is high) | none during the shift (Timeshifter: not useful for delaying); optional 0.5 mg at bedtime only as sleep aid, evidence low | moderate |
 | caffeine_ok (if usesCaffeine) | Wk → B − 6h | Wk → B − 6h | moderate |
@@ -49,6 +56,8 @@ Let `B = bodyBed_k` (today's target bedtime), `Wk = B + sleepLen` (target wake),
 - Optional `fast` window: from boarding until the destination breakfast (`Wk + 0.5h` on arrival day) — title "Optional: skip plane meals; drink water", evidence **low**, detail notes the evidence is limited (Forbes-Robertson 2012).
 - `hydrate` every 3 h in flight. `note`: "No alcohol; avoid caffeine on board except as scheduled."
 - `reset` point event at the first destination `Wk` after landing (or at landing if landing is after Wk and before B−6h): "Morning anchor: get outside in daylight, have coffee + a protein breakfast". If landing happens inside light_avoid, make the first item after landing a `light_avoid` with `key: true` ("Wear sunglasses from the gate until HH:mm").
+
+- Arrival day: `reset` at localWake (or landing+15 min if landing is after localWake and before localBed-6h). Titles by local time: light_avoid in 06:00-18:00 "Sunglasses on: avoid bright light", else "Dim lights, glasses on, no bright screens"; light_seek in daylight "Get outside into daylight", else "Bright indoor light (lamps/screens on)". Melatonin (advance) at localBed-90min while remaining > 0.5 h, skipped if the body-clock time is 00:00-05:00; delay: optional 0.5 mg sleep aid at localBed-30min.
 
 ## 5. Days and labels
 - Days run from `dep.startOf('day') − preShiftDays` (home zone) to `arr.startOf('day') + postArrivalDays` (dest zone).

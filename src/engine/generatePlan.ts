@@ -34,6 +34,8 @@ interface Card {
   label: string
   phase: PlanDay['phase']
   raws: Raw[]
+  bedS?: DateTime
+  bedE?: DateTime
 }
 
 const KIND_ORDER: ItemKind[] = [
@@ -128,6 +130,13 @@ export function generatePlan(input: TripInput): Plan {
   const destCity = cityForCode(legs[legs.length - 1].to) ?? destPlace
   const homePlace = placeForZone(home)
 
+  const lightTitle = (kind: 'light_seek' | 'light_avoid', st: DateTime, en: DateTime): string => {
+    const mid = DateTime.fromMillis((st.toMillis() + en.toMillis()) / 2, { zone: zoneAt(st.toMillis()) })
+    const day = mid.hour >= 6 && mid.hour < 18
+    if (kind === 'light_avoid') return day ? 'Sunglasses on: avoid bright light' : 'Dim lights, glasses on, no bright screens'
+    return day ? 'Get outside into daylight' : 'Bright indoor light (lamps/screens on)'
+  }
+
   // ---- 3. Items per body-clock cycle ----------------------------------------------------
   const cycleItems = (n: number): Raw[] => {
     const N = nights[n]
@@ -144,14 +153,14 @@ export function generatePlan(input: TripInput): Plan {
       push({ kind: 'light_seek', title: 'Get morning daylight', start: W, end: addHours(W, 2), evidence: 'strong', key: true,
         detail: 'CDC: morning light keeps your clock locked to the new time zone.' })
     } else if (strategy === 'advance') {
-      push({ kind: 'light_seek', title: 'Get bright light outside', start: W, end: addHours(W, 3), evidence: 'strong', key: true,
+      push({ kind: 'light_seek', title: lightTitle('light_seek', W, addHours(W, 3)), start: W, end: addHours(W, 3), evidence: 'strong', key: true,
         detail: "CDC: light soon after your body's temperature low advances the clock. Outdoors is best." })
-      push({ kind: 'light_avoid', title: 'Glasses on: avoid bright light', start: addHours(N, -3), end: N, evidence: 'strong', key: true,
+      push({ kind: 'light_avoid', title: lightTitle('light_avoid', addHours(N, -3), N), start: addHours(N, -3), end: N, evidence: 'strong', key: true,
         detail: 'Evening light delays the clock, the opposite of what you want. Dim lights and use blue-blocking glasses.' })
     } else {
-      push({ kind: 'light_seek', title: "Get bright light (your body's evening)", start: addHours(N, -4), end: addHours(N, -1), evidence: 'strong', key: true,
+      push({ kind: 'light_seek', title: lightTitle('light_seek', addHours(N, -4), addHours(N, -1)), start: addHours(N, -4), end: addHours(N, -1), evidence: 'strong', key: true,
         detail: "CDC: light before your body's temperature low delays the clock. Stay in bright light until a bit before bed." })
-      push({ kind: 'light_avoid', title: "Sunglasses on: avoid light (your body's morning)", start: W, end: addHours(W, 3), evidence: 'strong', key: true,
+      push({ kind: 'light_avoid', title: lightTitle('light_avoid', W, addHours(W, 3)), start: W, end: addHours(W, 3), evidence: 'strong', key: true,
         detail: 'Light soon after waking would pull your clock earlier, the wrong way for this plan.' })
     }
 
@@ -293,23 +302,22 @@ export function generatePlan(input: TripInput): Plan {
     })
   }
 
-  // normal cycles
+  // pre-departure cycles: habitual sleep shifted by the strategy
   for (const c of cards) {
-    if (c.phase === 'travel') continue
-    if (c.phase !== 'arrival') {
-      c.raws.push(...cycleItems(c.cycle))
-    }
-    c.raws.push({ kind: 'sleep', title: 'Sleep window', start: nights[c.cycle], end: nightEnd(c.cycle), evidence: 'strong', key: true,
-      detail: `Aim for about ${fmtH(len)} hours in a dark, cool room. Target shifts toward your destination bedtime each day.` })
+    if (c.phase !== 'pre') continue
+    c.raws.push(...cycleItems(c.cycle))
+    c.bedS = nights[c.cycle]
+    c.bedE = nightEnd(c.cycle)
+    c.raws.push({ kind: 'sleep', title: 'Sleep window', start: c.bedS, end: c.bedE, evidence: 'strong', key: true,
+      detail: `Aim for about ${fmtH(len)} hours in a dark, cool room. Bedtime moves about 1 h a day toward your target.` })
   }
-  // cycles P..a feed the travel/arrival cards through the router
+  // cycles P..a feed the travel card through the router (arrival is built from the local day below)
   for (let n = P; n <= a; n++) {
     for (const r of cycleItems(n)) {
       if (r.kind === 'wake' && n >= P + 1 && r.start.toMillis() < landMs) continue // replaced by in-flight wake below
-      for (const x of route(r)) (x.card === 'travel' ? travel : arrival).raws.push(x.raw)
+      for (const x of route(r)) if (x.card === 'travel') travel.raws.push(x.raw)
     }
   }
-  // arrival sleep already pushed in loop above (cycle a is 'arrival' card).
 
   // flights
   flights.forEach((f) => {
@@ -361,22 +369,210 @@ export function generatePlan(input: TripInput): Plan {
     travel.raws.push({ kind: 'hydrate', title: 'Drink water', start: t, evidence: 'low', detail: 'A glass every few hours helps with dry cabin air.' })
   }
 
-  // reset (morning anchor) + arrival hydrate
-  const destDay = landing.setZone(dest).startOf('day')
+  // ---- Arrival and post days: sleep and daily routine anchored to the LOCAL day ----------
   const bedUp = bed < wakeH ? bed + 24 : bed
-  let resetAt = wall(destDay, wakeH)
-  if (resetAt.toMillis() < landMs) {
-    if (landMs < wall(destDay, bedUp - 6).toMillis()) resetAt = addHours(landing, 0.25)
-    else resetAt = wall(destDay.plus({ days: 1 }), wakeH)
+  const Lday = landing.setZone(dest).startOf('day')
+  const bedAt = (dd: DateTime) => wall(dd, bedUp)
+  let nightDd: DateTime | undefined
+  for (const dd of [Lday.minus({ days: 1 }), Lday]) {
+    const b = bedAt(dd).toMillis()
+    if (b - 2 * 3600_000 <= landMs && landMs < b + len * 3600_000 - 3600_000) { nightDd = dd; break }
   }
-  if (resetAt.toMillis() >= nights[a].toMillis() && resetAt.toMillis() < nightEnd(a).toMillis()) resetAt = nightEnd(a)
-  arrival.raws.push({ kind: 'reset', title: 'Morning anchor: daylight, coffee, protein breakfast', start: resetAt, evidence: 'strong', key: true,
-    detail: 'Get outside in daylight, have a coffee and a protein-rich breakfast. Light plus caffeine is the strongest local cue (CDC).' })
-  arrival.raws.push({ kind: 'hydrate', title: 'Drink water after landing', start: addHours(landing, 0.5), evidence: 'low',
-    detail: 'Rehydrate after the flight.' })
+  const inFlightHours = inFlightSleep ? (inFlightSleep.end.toMillis() - inFlightSleep.start.toMillis()) / 3600_000 : 0
+  const shortNeeded = !!nightDd && inFlightHours < 4
+  let arrDd: DateTime = Lday
+  if (shortNeeded) arrDd = nightDd!.plus({ days: 1 })
+  else {
+    for (let i = -1; i <= 3; i++) {
+      const dd = Lday.plus({ days: i })
+      if (bedAt(dd).toMillis() >= landMs) { arrDd = dd; break }
+    }
+  }
+  const hw0 = addHours(bedAt(Lday.minus({ days: 1 })), len)
+  let shortSleep: { st: DateTime; en: DateTime } | undefined
+  if (shortNeeded) {
+    const st = addHours(landing, 1)
+    let en = addHours(bedAt(nightDd!), len)
+    if (en.toMillis() - st.toMillis() < 5 * 3600_000) en = addHours(st, 5)
+    shortSleep = { st, en }
+  }
+  const anchorArr = shortSleep ? shortSleep.en : hw0
+  const lwArr = DateTime.fromMillis(Math.max(landMs, anchorArr.toMillis()))
+  const nominalBed = bedAt(arrDd)
+  const lastWake = inFlightSleep ? inFlightSleep.end : wakeOf(P)
+  const earlier =
+    !shortSleep && nominalBed.toMillis() - lastWake.toMillis() > 16 * 3600_000 && addHours(nominalBed, -1).toMillis() > landMs
+  const arrBedStart = earlier ? addHours(nominalBed, -1) : nominalBed
+
+  const localDay = (c: Card, lw: DateTime, anchor: DateTime, lb: DateTime, isArr: boolean): Raw | undefined => {
+    const out = c.raws
+    const lwM = lw.toMillis()
+    const lbM = lb.toMillis()
+    const okDay = (t: DateTime, pad = 0) => t.toMillis() >= lwM + pad && t.toMillis() < lbM
+    const rem = tAbs - sAbs(c.cycle - 1)
+    const converged = rem <= 0.5
+
+    if (!isArr || lwM > landMs) {
+      out.push({ kind: 'wake', title: 'Get up', start: lw, evidence: 'strong',
+        detail: 'A steady wake time anchors your body clock; get light and move soon after.' })
+    }
+    // caffeine
+    const cStop = addHours(lb, -6)
+    const cStart = DateTime.fromMillis(Math.max(anchor.toMillis(), lwM))
+    if (input.usesCaffeine && cStop.toMillis() - cStart.toMillis() >= 45 * 60_000) {
+      out.push({ kind: 'caffeine_ok', title: 'Caffeine OK', start: cStart, end: cStop, evidence: 'moderate',
+        detail: 'CDC: caffeine in local daytime can help alertness while you adjust.' })
+      out.push({ kind: 'caffeine_stop', title: 'Last caffeine', start: cStop, evidence: 'moderate',
+        detail: 'Stop about 6 hours before bed so it does not cost you sleep.' })
+    }
+    // nap
+    const napS = DateTime.fromMillis(Math.max(addHours(anchor, 2).toMillis(), lwM))
+    const napE = addHours(lb, -8)
+    if (napE.toMillis() - napS.toMillis() >= 45 * 60_000) {
+      out.push({ kind: 'nap_ok', title: 'Short nap OK (≤30 min)', start: napS, end: napE, evidence: 'moderate',
+        detail: 'Keep it to 20–30 minutes and finish at least 8 hours before bed (CDC, Sleep Foundation).' })
+    }
+    // meals
+    const bf = addHours(anchor, 0.5)
+    const lunch = addHours(anchor, 5)
+    const dinner = addHours(lb, -3)
+    if (okDay(bf, 0) && bf.toMillis() < dinner.toMillis() - 4 * 3600_000) {
+      out.push({ kind: 'meal', title: 'Protein-forward breakfast', start: bf, evidence: 'low',
+        detail: 'Meal timing is a weak clock cue (limited evidence), but a protein breakfast helps you feel awake.' })
+      if (input.includeSupplements) out.push({ kind: 'supplement', title: 'Optional: B-complex (B6/B12) with breakfast', start: bf, evidence: 'low',
+        detail: 'Low evidence; sometimes used for energy. Skip if you take other B vitamins.' })
+    }
+    if (okDay(lunch, 0) && lunch.toMillis() < dinner.toMillis() - 2.5 * 3600_000) {
+      out.push({ kind: 'meal', title: 'Balanced lunch', start: lunch, evidence: 'low',
+        detail: 'Eat at local daytime hours; it nudges your clock very gently.' })
+      if (input.includeSupplements) out.push({ kind: 'supplement', title: 'Optional: vitamin C 500 mg + omega-3 1 g with lunch', start: lunch, evidence: 'low',
+        detail: 'Low evidence; sometimes used to ease travel fatigue.' })
+    }
+    if (okDay(dinner, 15 * 60_000)) {
+      out.push({ kind: 'meal', title: 'Lighter, low-carb dinner', start: dinner, evidence: 'low',
+        detail: 'A lighter meal before bed makes falling asleep easier.' })
+      if (input.includeSupplements) out.push({ kind: 'supplement', title: 'Optional: magnesium 200–300 mg with dinner', start: dinner, evidence: 'low',
+        detail: 'Low evidence; some people find it relaxing at bedtime.' })
+    }
+
+    // light: body-clock windows clipped to the local waking period
+    const bodyWin = (cc: number, kind: 'light_seek' | 'light_avoid'): [DateTime, DateTime] => {
+      const N = nights[cc]
+      const W = wakeOf(cc)
+      if (strategy === 'advance') return kind === 'light_seek' ? [W, addHours(W, 3)] : [addHours(N, -3), N]
+      return kind === 'light_seek' ? [addHours(N, -4), addHours(N, -1)] : [W, addHours(W, 3)]
+    }
+    let seekItem: Raw | undefined
+    for (const kind of ['light_seek', 'light_avoid'] as const) {
+      if (converged && kind === 'light_avoid') continue
+      let best: { s: number; e: number; gate: boolean } | undefined
+      const cands: Array<[DateTime, DateTime]> = []
+      if (converged) cands.push([DateTime.fromMillis(Math.max(anchor.toMillis(), lwM)), addHours(DateTime.fromMillis(Math.max(anchor.toMillis(), lwM)), 2)])
+      else for (let cc = c.cycle - 1; cc <= c.cycle + 1; cc++) if (cc >= 0 && cc <= lastCycle) cands.push(bodyWin(cc, kind))
+      for (const [ws, we] of cands) {
+        const s2 = Math.max(ws.toMillis(), lwM)
+        const e2 = Math.min(we.toMillis(), lbM)
+        if (e2 - s2 < 45 * 60_000) continue
+        if (!best || e2 - s2 > best.e - best.s) best = { s: s2, e: e2, gate: isArr && ws.toMillis() < landMs && s2 === landMs }
+      }
+      if (!best) continue
+      const st = DateTime.fromMillis(best.s, { zone: dest })
+      const en = DateTime.fromMillis(best.e, { zone: dest })
+      let title: string
+      let detail: string
+      if (converged) {
+        title = 'Get morning daylight'
+        detail = 'CDC: morning light keeps your clock locked to the new time zone.'
+      } else if (kind === 'light_seek') {
+        title = lightTitle('light_seek', st, en)
+        detail = strategy === 'advance'
+          ? "CDC: light in your body's morning, soon after its temperature low, advances the clock."
+          : "CDC: light in your body's evening, before its temperature low, delays the clock."
+      } else {
+        title = best.gate ? `Wear sunglasses from the gate until ${fmtHM(en, dest)}` : lightTitle('light_avoid', st, en)
+        detail = strategy === 'advance'
+          ? "This is your body's evening; light now would delay the clock, the wrong way for this plan."
+          : "This is your body's morning; light now would advance the clock, the wrong way for this plan."
+      }
+      const r: Raw = { kind, title, detail, start: st, end: en, evidence: 'strong', key: true }
+      out.push(r)
+      if (kind === 'light_seek') seekItem = r
+    }
+    if (seekItem && /daylight/.test(seekItem.title)) {
+      out.push({ kind: 'exercise', title: 'Walk outside', start: seekItem.start, end: DateTime.fromMillis(Math.min(seekItem.start.toMillis() + 3600_000, seekItem.end!.toMillis())),
+        evidence: 'low', detail: 'Light movement during your light window adds a small extra cue.' })
+    }
+
+    // melatonin
+    if (input.useMelatonin && rem > 0.5) {
+      if (strategy === 'advance') {
+        const t = addHours(lb, -1.5)
+        const hb = t.setZone(home)
+        const bodyHour = hb.hour + hb.minute / 60
+        if (!(bodyHour >= 0 && bodyHour < 5) && t.toMillis() > Math.max(lwM, isArr ? landMs : 0)) {
+          out.push({ kind: 'melatonin', title: 'Take 0.5–1 mg melatonin', start: t, evidence: 'moderate', key: true,
+            detail: 'CDC: a low dose about 90 minutes before bed helps shift your clock earlier. More is not better.' })
+        }
+      } else {
+        const t = addHours(lb, -0.5)
+        if (t.toMillis() > lwM) out.push({ kind: 'melatonin', title: 'Optional: 0.5 mg melatonin as a sleep aid', start: t, evidence: 'low',
+          detail: 'Melatonin does not help delay your clock, but a small dose at bedtime may help you fall asleep.' })
+      }
+    }
+
+    if (isArr) {
+      // morning anchor
+      let resetAt: DateTime | undefined
+      if (lwM > landMs) resetAt = lw
+      else if (landMs < addHours(lb, -6).toMillis() && landMs >= hw0.toMillis()) resetAt = addHours(landing, 0.25)
+      else if (landMs < hw0.toMillis()) resetAt = hw0
+      let reset: Raw | undefined
+      if (resetAt && resetAt.toMillis() < lbM) {
+        reset = { kind: 'reset', title: 'Morning anchor: daylight, coffee, protein breakfast', start: resetAt, evidence: 'strong', key: true,
+          detail: 'Get outside in daylight, have a coffee and a protein-rich breakfast. Light plus caffeine is the strongest local cue (CDC).' }
+        out.push(reset)
+      }
+      out.push({ kind: 'hydrate', title: 'Drink water after landing', start: addHours(landing, 0.5), evidence: 'low', detail: 'Rehydrate after the flight.' })
+      if (!shortSleep) {
+        const napCut = addHours(lb, -8)
+        const cut = napCut.toMillis() > lwM + 45 * 60_000 ? ` — nap ≤30 min allowed before ${fmtHM(napCut, dest)}` : ''
+        out.push({ kind: 'note', title: `Stay awake until ${fmtHM(lb, dest)} tonight${cut}`, start: lw, end: lb, evidence: 'moderate',
+          detail: 'Going to bed at the local time is the quickest way to lock in the new schedule (CDC).' })
+      }
+      return reset
+    }
+    return undefined
+  }
+
+  // arrival card
+  arrival.bedS = arrBedStart
+  arrival.bedE = addHours(nominalBed, len)
+  arrival.raws.push({ kind: 'sleep', title: 'Sleep window', start: arrBedStart, end: arrival.bedE, evidence: 'strong', key: true,
+    detail: `Local night: about ${fmtH(len)} hours in a dark, cool room.${earlier ? ' Up to an hour early because you have been awake a long time.' : ''}` })
+  const arrReset = localDay(arrival, lwArr, anchorArr, arrBedStart, true)
+  if (shortSleep) {
+    const t = `Sleep now until ${fmtHM(shortSleep.en, dest)}`
+    const detail = 'You land in the local night after little sleep on the plane; a short sleep now, then get up at the usual time.'
+    if (!travel.raws.some((r) => r.kind === 'sleep')) {
+      travel.raws.push({ kind: 'sleep', title: t, start: shortSleep.st, end: shortSleep.en, evidence: 'moderate', key: true, detail })
+    } else {
+      arrival.raws.push({ kind: 'nap_ok', title: t, start: shortSleep.st, end: shortSleep.en, evidence: 'moderate', detail })
+    }
+  }
+  // post cards
+  cards.filter((c) => c.phase === 'post').forEach((c, i) => {
+    const k = i + 1
+    const bs = bedAt(arrDd.plus({ days: k }))
+    const prevEnd = addHours(bedAt(arrDd.plus({ days: k - 1 })), len)
+    c.bedS = bs
+    c.bedE = addHours(bs, len)
+    c.raws.push({ kind: 'sleep', title: 'Sleep window', start: bs, end: c.bedE, evidence: 'strong', key: true,
+      detail: `Habitual bedtime in local time: about ${fmtH(len)} hours in a dark, cool room.` })
+    localDay(c, prevEnd, prevEnd, bs, false)
+  })
 
   // optional fast
-  const fastEnd = DateTime.fromMillis(Math.min(resetAt.toMillis(), addHours(dep0, 16).toMillis()))
+  const fastEnd = DateTime.fromMillis(Math.min((arrReset?.start ?? lwArr).toMillis(), addHours(dep0, 16).toMillis()))
   if (fastEnd.toMillis() > addHours(dep0, 2).toMillis()) {
     travel.raws.push({ kind: 'fast', title: 'Optional: skip plane meals; drink water', start: dep0, end: fastEnd, evidence: 'low',
       detail: 'Limited evidence (Forbes-Robertson 2012) that fasting then eating a morning meal helps; skip it if it makes you feel worse.' })
@@ -413,8 +609,8 @@ export function generatePlan(input: TripInput): Plan {
       zone: c.zone,
       label: c.label,
       phase: c.phase,
-      targetBedtime: fmtHM(nights[c.cycle], c.zone),
-      targetWake: fmtHM(nightEnd(c.cycle), c.zone),
+      targetBedtime: fmtHM(c.bedS ?? nights[c.cycle], c.zone),
+      targetWake: fmtHM(c.bedE ?? nightEnd(c.cycle), c.zone),
       remainingShiftHours: Math.round(Math.max(0, tAbs - prev) * 10) / 10,
       items,
     }
@@ -442,6 +638,14 @@ export function generatePlan(input: TripInput): Plan {
   const landLocalH = landing.hour
   if (landLocalH >= 22 || landLocalH < 5) {
     warnings.push('You land overnight at your destination; consider a hotel booking from the night before')
+  }
+  if (tAbs > 0.5) {
+    for (let n = P; n <= lastCycle; n++) {
+      if (nightEnd(n).toMillis() > landMs) {
+        warnings.push(`First days in ${destPlace} you'll be sleepy around ${fmtHM(nights[n], dest)}–${fmtHM(nightEnd(n), dest)} local; short naps only`)
+        break
+      }
+    }
   }
   if (!input.useMelatonin && strategy === 'advance' && tAbs > 0) {
     warnings.push('Melatonin is turned off: shifting earlier will be slower without it')

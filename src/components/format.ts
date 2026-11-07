@@ -10,6 +10,21 @@ export function timeRange(item: PlanItem): string {
   return item.end ? `${a} – ${hhmm(item.end, item.zone)}` : a
 }
 
+export function itemRange(item: PlanItem, flightEndZone?: string): string {
+  const s = DateTime.fromISO(item.start, { setZone: true }).setZone(item.zone)
+  const a = s.toFormat('HH:mm')
+  if (!item.end) return a
+  if (item.kind === 'flight' && flightEndZone) {
+    const e = DateTime.fromISO(item.end, { setZone: true }).setZone(flightEndZone)
+    const days = Math.round(e.startOf('day').diff(s.startOf('day'), 'days').days)
+    const plus = days > 0 ? ` (+${days} day${days > 1 ? 's' : ''})` : days < 0 ? ` (${days} day)` : ''
+    return `${a} ${s.toFormat('ZZZZ')} → ${e.toFormat('HH:mm ZZZZ')}${plus}`
+  }
+  const e = DateTime.fromISO(item.end, { setZone: true }).setZone(item.zone)
+  const days = Math.round(e.startOf('day').diff(s.startOf('day'), 'days').days)
+  return `${a} – ${e.toFormat('HH:mm')}${days > 0 ? ` (+${days})` : ''}`
+}
+
 export function zoneAbbr(iso: string, zone: string): string {
   return DateTime.fromISO(iso, { setZone: true }).setZone(zone).toFormat('ZZZZ')
 }

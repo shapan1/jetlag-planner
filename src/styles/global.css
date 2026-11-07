@@ -204,3 +204,4 @@ td small, th small { display: block; color: var(--muted); font-weight: 400; }
   .tl-more summary { display: none; }
   .container { max-width: none; }
 }
+.share-url { flex: 1 1 100%; }

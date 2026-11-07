@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Plan } from '../engine/types'
 import { encodeInput } from '../lib/share'
 import { planToIcs } from '../lib/ics'
@@ -10,19 +10,25 @@ interface Props {
 
 export default function Toolbar({ plan, onEdit }: Props) {
   const [msg, setMsg] = useState('')
+  const [fallbackUrl, setFallbackUrl] = useState('')
+  const urlRef = useRef<HTMLInputElement>(null)
   const flash = (m: string) => {
     setMsg(m)
-    window.setTimeout(() => setMsg(''), 2500)
+    window.setTimeout(() => setMsg(''), 2000)
   }
 
   const share = async () => {
     location.hash = encodeInput(plan.input)
     const url = location.href
     try {
+      if (!navigator.clipboard) throw new Error('no clipboard')
       await navigator.clipboard.writeText(url)
+      setFallbackUrl('')
       flash('Link copied')
     } catch {
-      window.prompt('Copy this link', url)
+      setFallbackUrl(url)
+      window.setTimeout(() => urlRef.current?.select(), 0)
+      flash('Press and hold to copy the link')
     }
   }
 
@@ -56,6 +62,16 @@ export default function Toolbar({ plan, onEdit }: Props) {
       <span className="toast" role="status" aria-live="polite">
         {msg}
       </span>
+      {fallbackUrl && (
+        <input
+          ref={urlRef}
+          className="share-url"
+          readOnly
+          value={fallbackUrl}
+          aria-label="Share link"
+          onFocus={(e) => e.currentTarget.select()}
+        />
+      )}
     </div>
   )
 }

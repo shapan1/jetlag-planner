@@ -40,7 +40,7 @@ describe('strategy and raw shift', () => {
     expect(p.summary.strategy).toBe('advance')
     let checked = 0
     for (const d of p.days) {
-      if (d.phase === 'travel' || d.remainingShiftHours <= 0) continue
+      if (d.phase === 'travel' || d.phase === 'arrival' || d.remainingShiftHours <= 0.5) continue
       const sl = d.items.find((i) => i.kind === 'sleep')!
       const mel = d.items.find((i) => i.kind === 'melatonin')
       expect(mel, d.date).toBeDefined()
@@ -130,3 +130,54 @@ describe('structure', () => {
     expect(arr.items.some((i) => i.kind === 'reset')).toBe(true)
   })
 })
+
+describe('local-day anchoring', () => {
+  const routes = [['BLR', base], ['DEL', jfkDel], ['BOM', sfoBom]] as const
+  for (const [name, inp] of routes) {
+    it(`${name}: arrival-day sleep starts 20:00-23:59 local`, () => {
+      const p = generatePlan(inp)
+      const arr = p.days.find((d) => d.phase === 'arrival')!
+      const sl = arr.items.find((i) => i.kind === 'sleep')!
+      const h = DateTime.fromISO(sl.start, { setZone: true }).hour
+      expect(h).toBeGreaterThanOrEqual(20)
+      expect(sl.zone).toBe(inp.destZone)
+    })
+    it(`${name}: post-arrival sleep is habitual bed/wake in destination zone`, () => {
+      const p = generatePlan(inp)
+      for (const d of p.days.filter((x) => x.phase === 'post')) {
+        const sl = d.items.find((i) => i.kind === 'sleep')!
+        expect(DateTime.fromISO(sl.start, { setZone: true }).toFormat('HH:mm')).toBe('23:00')
+        expect(DateTime.fromISO(sl.end!, { setZone: true }).toFormat('HH:mm')).toBe('07:00')
+      }
+    })
+    it(`${name}: no meal/caffeine_ok in sleep, light windows in waking hours`, () => {
+      const p = generatePlan(inp)
+      const all = p.days.flatMap((d) => d.items)
+      const sl = all.filter((i) => i.kind === 'sleep').map((i) => [DateTime.fromISO(i.start).toMillis(), DateTime.fromISO(i.end!).toMillis()])
+      const inside = (t: number) => sl.some(([a, b]) => t > a && t < b)
+      const overlaps = (s: number, e: number) => sl.some(([a, b]) => s < b && e > a)
+      for (const i of all) {
+        const s = DateTime.fromISO(i.start).toMillis()
+        const e = i.end ? DateTime.fromISO(i.end).toMillis() : s
+        if (i.kind === 'meal') expect(inside(s), i.title).toBe(false)
+        if (i.kind === 'caffeine_ok') expect(overlaps(s, e), i.title).toBe(false)
+        if ((i.kind === 'light_seek' || i.kind === 'light_avoid') && !i.title.startsWith('Glasses on / eyeshade')) {
+          expect(overlaps(s, e), i.title + i.start).toBe(false)
+        }
+      }
+    })
+  }
+
+  it('short sleep when landing in the local night after little in-flight sleep', () => {
+    const inp: TripInput = { ...jfkDel, legs: [{ ...jfkDel.legs[0], departLocal: '2026-07-10T08:00', arriveLocal: '2026-07-11T01:00' }] }
+    const p = generatePlan(inp)
+    const all = p.days.flatMap((d) => d.items)
+    expect(all.some((i) => i.title.startsWith('Sleep now until'))).toBe(true)
+    for (const d of p.days) expect(d.items.filter((i) => i.kind === 'sleep').length).toBeLessThanOrEqual(1)
+  })
+
+  it('adds a sleepy-window warning', () => {
+    expect(generatePlan(base).summary.warnings.join(' ')).toMatch(/First days in India you'll be sleepy around 13:00–21:00 local/)
+  })
+})
+
